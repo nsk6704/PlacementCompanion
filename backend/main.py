@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,6 +31,24 @@ async def lifespan(app: FastAPI):
     create_db_and_tables()
     
     with Session(engine) as session:
+        # MIGRATION: Ensure user_email column exists
+        try:
+            from sqlalchemy import inspect, String
+            inspector = inspect(engine)
+            columns = [col['name'] for col in inspector.get_columns('studentcheckin')]
+            
+            if 'user_email' not in columns:
+                print("Adding user_email column to studentcheckin table...")
+                from sqlalchemy import text
+                session.exec(text("ALTER TABLE studentcheckin ADD COLUMN user_email VARCHAR"))
+                session.commit()
+                print("Migration: Added user_email column successfully.")
+            else:
+                print("Migration: user_email column already exists.")
+        except Exception as e:
+            print(f"Migration warning: {e}")
+            session.rollback()
+
         statement = select(SurveyMetadata).where(SurveyMetadata.key == "survey_distributions")
         result = session.exec(statement).first()
         
@@ -56,7 +75,7 @@ app = FastAPI(title="Placement Companion API", lifespan=lifespan)
 # Allow CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -135,9 +154,16 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/check-in")
+@app.post("/check-in", response_model=StudentCheckIn)
 def create_check_in(check_in: StudentCheckIn, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    check_in.user_email = current_user.email
     session.add(check_in)
     session.commit()
     session.refresh(check_in)
     return check_in
+
+@app.get("/check-ins", response_model=List[StudentCheckIn])
+def read_check_ins(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    statement = select(StudentCheckIn).where(StudentCheckIn.user_email == current_user.email).order_by(StudentCheckIn.created_at.desc())
+    results = session.exec(statement).all()
+    return results

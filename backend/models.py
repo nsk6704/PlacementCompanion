@@ -12,6 +12,7 @@ class StudentCheckIn(SQLModel, table=True):
     prep_consistency: str
     stress: int
     coping: str
+    user_email: Optional[str] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class SurveyMetadata(SQLModel, table=True):

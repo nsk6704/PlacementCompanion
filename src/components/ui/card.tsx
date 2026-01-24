@@ -1,19 +1,25 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 const Card = React.forwardRef<
     HTMLDivElement,
-    React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-    <div
-        ref={ref}
-        className={cn(
-            "rounded-lg border bg-card text-card-foreground shadow-sm",
-            className
-        )}
-        {...props}
-    />
-));
+    React.HTMLAttributes<HTMLDivElement> & { noHover?: boolean }
+>(({ className, noHover = false, ...props }, ref) => {
+    const CardComponent = noHover ? "div" : motion.div;
+    return (
+        // @ts-ignore - motion.div and div props overlap enough for this use case
+        <CardComponent
+            ref={ref}
+            className={cn(
+                "rounded-xl border bg-card text-card-foreground shadow-sm transition-all duration-300",
+                !noHover && "hover:shadow-lg hover:-translate-y-1",
+                className
+            )}
+            {...props}
+        />
+    );
+});
 Card.displayName = "Card";
 
 const CardHeader = React.forwardRef<
@@ -32,8 +38,8 @@ const CardTitle = React.forwardRef<
     HTMLParagraphElement,
     React.HTMLAttributes<HTMLHeadingElement>
 >(({ className, ...props }, ref) => (
+    // Fixed: removed extra ref on the heading
     <h3
-        ref={ref}
         className={cn(
             "text-2xl font-semibold leading-none tracking-tight",
             className

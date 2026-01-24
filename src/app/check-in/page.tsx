@@ -6,24 +6,46 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { motion } from "framer-motion";
-import { Check, ArrowRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Check, ArrowRight, ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { UserProfile } from "@/lib/insightsEngine";
 
 export default function CheckInPage() {
+    const router = useRouter();
     const [step, setStep] = useState(1);
-    const [formData, setFormData] = useState({
-        intensity: 5,
+    const [formData, setFormData] = useState<UserProfile>({
         stress: 5,
-        consistency: "neutral", // consistent, neutral, inconsistent
+        prepHours: "moderate",
+        prepConsistency: "moderate",
+        department: "",
+        cgpa: "",
+        stage: "",
+        coping: "",
     });
 
+    const totalSteps = 4;
+
     const handleNext = () => {
-        if (step < 3) setStep(step + 1);
-        else {
-            // TODO: Submit logic
-            console.log("Submitted:", formData);
+        if (step < totalSteps) {
+            setStep(step + 1);
+        } else {
+            // Convert collected data into query params for the results page
+            const params = new URLSearchParams();
+            Object.entries(formData).forEach(([key, value]) => {
+                if (value) params.append(key, String(value));
+            });
+            router.push(`/check-in/results?${params.toString()}`);
         }
     };
+
+    const handleBack = () => {
+        if (step > 1) setStep(step - 1);
+    }
+
+    const updateField = (field: keyof UserProfile, value: any) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    }
 
     return (
         <div className="min-h-screen bg-muted/20 pb-20">
@@ -35,8 +57,8 @@ export default function CheckInPage() {
                     transition={{ duration: 0.5 }}
                 >
                     <div className="mb-8 text-center">
-                        <h1 className="text-3xl font-bold tracking-tight mb-2">Daily Check-in</h1>
-                        <p className="text-muted-foreground">Take a moment to reflect on your journey today.</p>
+                        <h1 className="text-3xl font-bold tracking-tight mb-2">Daily Reflection</h1>
+                        <p className="text-muted-foreground">Understanding your context helps us provide better support.</p>
                     </div>
 
                     <Card className="border-none shadow-lg bg-background/80 backdrop-blur-sm overflow-hidden">
@@ -44,90 +66,156 @@ export default function CheckInPage() {
                             <motion.div
                                 className="h-full bg-primary"
                                 initial={{ width: "0%" }}
-                                animate={{ width: `${(step / 3) * 100}%` }}
+                                animate={{ width: `${(step / totalSteps) * 100}%` }}
                             />
                         </div>
-                        <CardHeader>
-                            <CardTitle className="text-xl">
-                                {step === 1 && "How intense was your preparation today?"}
-                                {step === 2 && "How are you feeling mentally?"}
-                                {step === 3 && "How consistent have you been lately?"}
-                            </CardTitle>
-                            <CardDescription>
-                                {step === 1 && "It's okay to have light days. Honesty helps tracking."}
-                                {step === 2 && "Rate your stress or anxiety levels."}
-                                {step === 3 && "Consistency matters more than intensity."}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-8">
 
-                            {step === 1 && (
-                                <div className="py-8">
-                                    <div className="flex justify-between text-sm text-muted-foreground mb-4">
-                                        <span>Rest Day</span>
-                                        <span>Moderate</span>
-                                        <span>Grind Mode</span>
-                                    </div>
-                                    <Slider
-                                        value={formData.intensity}
-                                        onValueChange={(val) => setFormData({ ...formData, intensity: val })}
-                                        max={10}
-                                    />
-                                    <div className="mt-4 text-center text-2xl font-semibold text-primary">
-                                        {formData.intensity}/10
-                                    </div>
-                                </div>
-                            )}
+                        <CardContent className="pt-6 min-h-[400px] flex flex-col justify-between">
+                            <AnimatePresence mode="wait">
+                                <motion.div
+                                    key={step}
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -20 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="flex-1"
+                                >
+                                    {/* STEP 1: ACADEMIC CONTEXT */}
+                                    {step === 1 && (
+                                        <div className="space-y-6">
+                                            <Header title="About You" desc="Help us understand your academic environment." />
+                                            <SelectGroup
+                                                label="Department"
+                                                options={[
+                                                    { val: "CS/IT", label: "CS / IT" },
+                                                    { val: "ELECTRICAL/ELECTRONICS", label: "Electrical / Electronics" },
+                                                    { val: "MECHANICAL", label: "Mechanical" },
+                                                    { val: "OTHER", label: "Other" },
+                                                ]}
+                                                value={formData.department}
+                                                onChange={(v) => updateField("department", v)}
+                                            />
+                                            <SelectGroup
+                                                label="Current CGPA Range"
+                                                options={[
+                                                    { val: "<7", label: "Below 7" },
+                                                    { val: "7-8", label: "7 - 8" },
+                                                    { val: "8-9", label: "8 - 9" },
+                                                    { val: "9+", label: "9+" },
+                                                ]}
+                                                value={formData.cgpa}
+                                                onChange={(v) => updateField("cgpa", v)}
+                                            />
+                                        </div>
+                                    )}
 
-                            {step === 2 && (
-                                <div className="py-8">
-                                    <div className="flex justify-between text-sm text-muted-foreground mb-4">
-                                        <span>Calm</span>
-                                        <span>Manageable</span>
-                                        <span>Overwhelmed</span>
-                                    </div>
-                                    <Slider
-                                        value={formData.stress}
-                                        onValueChange={(val) => setFormData({ ...formData, stress: val })}
-                                        max={10}
-                                    />
-                                    <div className="mt-4 text-center text-2xl font-semibold text-primary">
-                                        {formData.stress}/10
-                                    </div>
-                                </div>
-                            )}
+                                    {/* STEP 2: PLACEMENT STAGE */}
+                                    {step === 2 && (
+                                        <div className="space-y-6">
+                                            <Header title="Where are you right now?" desc="Different stages bring different pressures." />
+                                            <SelectGroup
+                                                label="Current Stage"
+                                                options={[
+                                                    { val: "online_tests", label: "Online Tests / Assessments" },
+                                                    { val: "technical_interviews", label: "Technical Interviews" },
+                                                    { val: "hr_round", label: "HR Round" },
+                                                    { val: "still_applying", label: "Still Applying (No responses)" },
+                                                ]}
+                                                value={formData.stage}
+                                                onChange={(v) => updateField("stage", v)}
+                                            />
+                                        </div>
+                                    )}
 
-                            {step === 3 && (
-                                <div className="grid grid-cols-1 gap-4 py-4">
-                                    {[
-                                        { val: "consistent", label: "Very Consistent", desc: "I stuck to my plan most days." },
-                                        { val: "neutral", label: "Somewhat Consistent", desc: "Missed a few sessions, but kept going." },
-                                        { val: "inconsistent", label: "Struggling", desc: "Hard to maintain a routine right now." },
-                                    ].map((option) => (
-                                        <div
-                                            key={option.val}
-                                            className={cn(
-                                                "p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50",
-                                                formData.consistency === option.val ? "border-primary bg-primary/5" : "border-muted"
-                                            )}
-                                            onClick={() => setFormData({ ...formData, consistency: option.val })}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <div className="font-semibold">{option.label}</div>
-                                                    <div className="text-sm text-muted-foreground">{option.desc}</div>
+                                    {/* STEP 3: HABITS */}
+                                    {step === 3 && (
+                                        <div className="space-y-8">
+                                            <Header title="Preparation Habits" desc="Be honest. This is a judgement-free zone." />
+
+                                            <div>
+                                                <label className="text-sm font-medium mb-4 block">Preparation Intensity</label>
+                                                <div className="grid grid-cols-3 gap-3">
+                                                    {[
+                                                        { val: "low", label: "Light", desc: "< 2 hrs" },
+                                                        { val: "moderate", label: "Moderate", desc: "3-5 hrs" },
+                                                        { val: "high", label: "Heavy", desc: "6+ hrs" }
+                                                    ].map((opt) => (
+                                                        <TileOption
+                                                            key={opt.val}
+                                                            selected={formData.prepHours === opt.val}
+                                                            onClick={() => updateField("prepHours", opt.val)}
+                                                            label={opt.label}
+                                                            sub={opt.desc}
+                                                        />
+                                                    ))}
                                                 </div>
-                                                {formData.consistency === option.val && <Check className="h-5 w-5 text-primary" />}
+                                            </div>
+
+                                            <div>
+                                                <label className="text-sm font-medium mb-4 block">Consistency</label>
+                                                <div className="grid grid-cols-3 gap-3">
+                                                    {[
+                                                        { val: "low", label: "Sporadic", desc: "Hard to stick to plan" },
+                                                        { val: "moderate", label: "Okay", desc: "Missed some days" },
+                                                        { val: "high", label: "Solid", desc: "Every single day" }
+                                                    ].map((opt) => (
+                                                        <TileOption
+                                                            key={opt.val}
+                                                            selected={formData.prepConsistency === opt.val}
+                                                            onClick={() => updateField("prepConsistency", opt.val)}
+                                                            label={opt.label}
+                                                            sub={opt.desc}
+                                                        />
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
+                                    )}
 
-                            <div className="flex justify-end pt-4">
-                                <Button onClick={handleNext} className="w-full sm:w-auto">
-                                    {step === 3 ? "Complete Check-in" : "Next"}
-                                    {step !== 3 && <ArrowRight className="ml-2 h-4 w-4" />}
+                                    {/* STEP 4: EMOTION */}
+                                    {step === 4 && (
+                                        <div className="space-y-8">
+                                            <Header title="Emotional Check-in" desc="How is this affecting you?" />
+                                            <div>
+                                                <div className="flex justify-between mb-2">
+                                                    <span className="text-sm font-medium">Stress Level</span>
+                                                    <span className="text-primary font-bold">{formData.stress}/10</span>
+                                                </div>
+                                                <Slider
+                                                    value={formData.stress || 5}
+                                                    max={10}
+                                                    onValueChange={(v) => updateField("stress", v)}
+                                                />
+                                                <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                                    <span>Zen</span>
+                                                    <span>Manageable</span>
+                                                    <span>Panic</span>
+                                                </div>
+                                            </div>
+
+                                            <SelectGroup
+                                                label="How are you coping mainly?"
+                                                options={[
+                                                    { val: "passive", label: "Distraction (Netflix, Sleeping)" },
+                                                    { val: "active", label: "Talking, Exercise, Hobbies" },
+                                                    { val: "nothing", label: "Nothing helps right now" },
+                                                ]}
+                                                value={formData.coping}
+                                                onChange={(v) => updateField("coping", v)}
+                                            />
+                                        </div>
+                                    )}
+
+                                </motion.div>
+                            </AnimatePresence>
+
+                            <div className="flex justify-between pt-8 mt-4 border-t">
+                                <Button variant="ghost" onClick={handleBack} disabled={step === 1}>
+                                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                                </Button>
+                                <Button onClick={handleNext} className="rounded-full px-8">
+                                    {step === totalSteps ? "Get Insights" : "Next"}
+                                    {step !== totalSteps && <ArrowRight className="ml-2 h-4 w-4" />}
                                 </Button>
                             </div>
                         </CardContent>
@@ -136,4 +224,52 @@ export default function CheckInPage() {
             </div>
         </div>
     );
+}
+
+// Sub-components for cleaner code
+function Header({ title, desc }: { title: string, desc: string }) {
+    return (
+        <div className="mb-6">
+            <h2 className="text-2xl font-semibold mb-1">{title}</h2>
+            <p className="text-muted-foreground">{desc}</p>
+        </div>
+    )
+}
+
+function SelectGroup({ label, options, value, onChange }: { label: string, options: { val: string, label: string }[], value?: string, onChange: (v: string) => void }) {
+    return (
+        <div className="space-y-3">
+            <label className="text-sm font-medium">{label}</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {options.map((opt) => (
+                    <div
+                        key={opt.val}
+                        onClick={() => onChange(opt.val)}
+                        className={cn(
+                            "cursor-pointer rounded-lg border p-3 transition-all hover:bg-muted/50 flex items-center justify-between",
+                            value === opt.val ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-input"
+                        )}
+                    >
+                        <span className="text-sm">{opt.label}</span>
+                        {value === opt.val && <Check className="h-4 w-4 text-primary" />}
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+function TileOption({ label, sub, selected, onClick }: { label: string, sub: string, selected: boolean, onClick: () => void }) {
+    return (
+        <div
+            onClick={onClick}
+            className={cn(
+                "cursor-pointer rounded-xl border p-4 text-center transition-all hover:bg-muted/50",
+                selected ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-input"
+            )}
+        >
+            <div className="font-semibold text-sm">{label}</div>
+            <div className="text-xs text-muted-foreground mt-1">{sub}</div>
+        </div>
+    )
 }

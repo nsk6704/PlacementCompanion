@@ -1,15 +1,37 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import PlotWrapper from "@/components/dashboard/PlotWrapper";
 import { motion } from "framer-motion";
+import { apiRequest } from "@/lib/api";
 
 export default function DashboardPage() {
-    // Mock Data
+    const [loading, setLoading] = useState(true);
+    const [checkIns, setCheckIns] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchHistory = async () => {
+            try {
+                const data = await apiRequest("/check-ins");
+                setCheckIns(data);
+            } catch (error) {
+                console.error("Failed to fetch history", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchHistory();
+    }, []);
+
+    // Process Data for Charts
+    const sortedData = [...checkIns].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+    // 1. Stress Trends
     const stressData = {
-        x: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-        y: [6, 7, 5, 8, 8, 4, 3],
+        x: sortedData.map(d => new Date(d.created_at).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })),
+        y: sortedData.map(d => d.stress),
         type: "scatter" as const,
         mode: "lines+markers" as const,
         marker: { color: "#84A98C" }, // Primary color
@@ -17,15 +39,45 @@ export default function DashboardPage() {
         name: "Stress Level",
     };
 
+    // 2. Focus/Prep Distribution (Aggregation of prep_hours)
+    const prepCounts = sortedData.reduce((acc: any, curr: any) => {
+        const key = curr.prep_hours || "Unknown";
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+    }, {});
+
     const activityData = {
-        x: ["Tests", "Coding", "Interviews", "Rest"],
-        y: [20, 45, 15, 20],
+        labels: Object.keys(prepCounts).map(k => k.charAt(0).toUpperCase() + k.slice(1)),
+        values: Object.values(prepCounts) as number[],
         type: "pie" as const,
         marker: {
             colors: ["#94A3B8", "#84A98C", "#E0F2F1", "#F3F4F6"]
         },
         hole: 0.4,
     };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-muted/20 pb-20">
+                <Navbar />
+                <div className="container mx-auto px-4 py-20 text-center">
+                    <p>Loading your insights...</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (checkIns.length === 0) {
+        return (
+            <div className="min-h-screen bg-muted/20 pb-20">
+                <Navbar />
+                <div className="container mx-auto px-4 py-20 text-center">
+                    <h2 className="text-xl font-semibold mb-4">No check-ins yet</h2>
+                    <p className="mb-4 text-muted-foreground">Complete your first daily reflection to see insights here.</p>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen bg-muted/20 pb-20">
@@ -47,7 +99,7 @@ export default function DashboardPage() {
                     <Card className="border-none shadow-md">
                         <CardHeader>
                             <CardTitle>Stress Trends</CardTitle>
-                            <CardDescription>Your reported stress levels over the last 7 days.</CardDescription>
+                            <CardDescription>Your reported stress levels over time.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="w-full h-[300px]">
@@ -71,8 +123,8 @@ export default function DashboardPage() {
 
                     <Card className="border-none shadow-md">
                         <CardHeader>
-                            <CardTitle>Focus Distribution</CardTitle>
-                            <CardDescription>How you've spent your preparation time.</CardDescription>
+                            <CardTitle>Prep Intensity</CardTitle>
+                            <CardDescription>Distribution of your preparation hours.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="w-full h-[300px]">
@@ -101,15 +153,8 @@ export default function DashboardPage() {
                             <div className="flex items-start gap-4">
                                 <div className="bg-white p-2 rounded-full shadow-sm text-2xl">🌱</div>
                                 <div>
-                                    <h4 className="font-semibold">Consistency is Key</h4>
-                                    <p className="text-sm text-muted-foreground">You've checked in 5 days in a row! Consistent low-intensity work beats sporadic burnout sessions.</p>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-4">
-                                <div className="bg-white p-2 rounded-full shadow-sm text-2xl">⚡</div>
-                                <div>
-                                    <h4 className="font-semibold">Watch the Spikes</h4>
-                                    <p className="text-sm text-muted-foreground">Your stress peaked on Thursday. Try to schedule a lighter load after heavy test days.</p>
+                                    <h4 className="font-semibold">Keep Tracking</h4>
+                                    <p className="text-sm text-muted-foreground">You have logged {checkIns.length} check-ins. Consistency helps us spot patterns!</p>
                                 </div>
                             </div>
                         </CardContent>

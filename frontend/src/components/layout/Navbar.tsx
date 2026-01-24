@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -14,6 +15,35 @@ const navItems = [
 
 export function Navbar() {
     const pathname = usePathname();
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const router = useRouter();
+
+    useEffect(() => {
+        const checkAuth = () => {
+            const token = localStorage.getItem("token");
+            setIsLoggedIn(!!token);
+        };
+
+        checkAuth();
+        // Listen for storage events (optional, but good for multi-tab sync)
+        window.addEventListener("storage", checkAuth);
+
+        // Also a custom event for instant updates within the app
+        window.addEventListener("auth-change", checkAuth);
+
+        return () => {
+            window.removeEventListener("storage", checkAuth);
+            window.removeEventListener("auth-change", checkAuth);
+        };
+    }, []);
+
+    const handleSignOut = () => {
+        localStorage.removeItem("token");
+        setIsLoggedIn(false);
+        // Dispatch event
+        window.dispatchEvent(new Event("auth-change"));
+        router.push("/login");
+    }
 
     return (
         <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
@@ -47,7 +77,13 @@ export function Navbar() {
                             )}
                         </Link>
                     ))}
-                    <Button size="sm" variant="outline">Sign In</Button>
+                    {isLoggedIn ? (
+                        <Button size="sm" variant="outline" onClick={handleSignOut}>Sign Out</Button>
+                    ) : (
+                        <Link href="/login">
+                            <Button size="sm" variant="outline">Sign In</Button>
+                        </Link>
+                    )}
                 </nav>
             </div>
         </header>

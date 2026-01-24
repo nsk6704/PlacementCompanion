@@ -26,16 +26,45 @@ export default function CheckInPage() {
 
     const totalSteps = 4;
 
-    const handleNext = () => {
+    // Check auth on mount
+    if (typeof window !== 'undefined' && !localStorage.getItem('token')) {
+        router.push('/login');
+    }
+
+    const { apiRequest } = require("@/lib/api"); // Lazy load to avoid server-side issues if any
+
+    const handleNext = async () => {
         if (step < totalSteps) {
             setStep(step + 1);
         } else {
-            // Convert collected data into query params for the results page
-            const params = new URLSearchParams();
-            Object.entries(formData).forEach(([key, value]) => {
-                if (value) params.append(key, String(value));
-            });
-            router.push(`/check-in/results?${params.toString()}`);
+            try {
+                // Prepare data for backend (snake_case conversion if needed, but our model uses snake_case keys in backend too? 
+                // Let's check model: department, cgpa, stage, prep_hours, prep_consistency, stress, coping)
+                const payload = {
+                    department: formData.department,
+                    cgpa: formData.cgpa,
+                    stage: formData.stage,
+                    prep_hours: formData.prepHours,
+                    prep_consistency: formData.prepConsistency,
+                    stress: formData.stress,
+                    coping: formData.coping
+                };
+
+                await apiRequest("/check-in", {
+                    method: "POST",
+                    body: JSON.stringify(payload)
+                });
+
+                // Convert collected data into query params for the results page
+                const params = new URLSearchParams();
+                Object.entries(formData).forEach(([key, value]) => {
+                    if (value) params.append(key, String(value));
+                });
+                router.push(`/check-in/results?${params.toString()}`);
+            } catch (error) {
+                console.error("Failed to submit check-in:", error);
+                // Optionally show error to user
+            }
         }
     };
 

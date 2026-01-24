@@ -167,3 +167,41 @@ def read_check_ins(current_user: User = Depends(get_current_user), session: Sess
     statement = select(StudentCheckIn).where(StudentCheckIn.user_email == current_user.email).order_by(StudentCheckIn.created_at.desc())
     results = session.exec(statement).all()
     return results
+
+@app.get("/insights/personalized")
+def get_personalized_insights(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """
+    Generate personalized insights based on user's check-in history and population data
+    """
+    from insights_engine import generate_personalized_insights
+    
+    # Get user's check-ins
+    statement = select(StudentCheckIn).where(StudentCheckIn.user_email == current_user.email).order_by(StudentCheckIn.created_at)
+    checkins = session.exec(statement).all()
+    
+    # Convert to dict format for insights engine
+    checkins_data = [
+        {
+            "stress": c.stress,
+            "department": c.department,
+            "cgpa": c.cgpa,
+            "stage": c.stage,
+            "prep_hours": c.prep_hours,
+            "prep_consistency": c.prep_consistency,
+            "coping": c.coping,
+            "created_at": c.created_at.isoformat()
+        }
+        for c in checkins
+    ]
+    
+    # Get survey distributions
+    dist_statement = select(SurveyMetadata).where(SurveyMetadata.key == "survey_distributions")
+    dist_result = session.exec(dist_statement).first()
+    
+    if not dist_result:
+        raise HTTPException(status_code=500, detail="Survey data not available")
+    
+    # Generate insights
+    insights = generate_personalized_insights(checkins_data, dist_result.data)
+    
+    return insights

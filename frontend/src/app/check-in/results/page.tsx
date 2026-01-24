@@ -43,6 +43,9 @@ function ResultsContent() {
                         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                             Based on your profile, here's what the data says. Your feelings are a normal response to your situation.
                         </p>
+                        <p className="text-xs text-muted-foreground/70 mt-3">
+                            Insights powered by research with 130+ students across departments
+                        </p>
                     </div>
 
                     <div className="grid gap-6">

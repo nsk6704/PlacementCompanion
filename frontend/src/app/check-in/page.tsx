@@ -86,8 +86,9 @@ export default function CheckInPage() {
                     transition={{ duration: 0.5 }}
                 >
                     <div className="mb-8 text-center">
-                        <h1 className="text-3xl font-bold tracking-tight mb-2">Daily Reflection</h1>
-                        <p className="text-muted-foreground">Understanding your context helps us provide better support.</p>
+                        <h1 className="text-3xl font-bold tracking-tight mb-2">Daily Check-In</h1>
+                        <p className="text-muted-foreground">A quick reflection to track your journey and get personalized insights.</p>
+                        <p className="text-xs text-muted-foreground/70 mt-2">Based on research with 130+ students across departments</p>
                     </div>
 
                     <Card className="border-none shadow-lg bg-background/80 backdrop-blur-sm overflow-hidden">
@@ -112,9 +113,9 @@ export default function CheckInPage() {
                                     {/* STEP 1: ACADEMIC CONTEXT */}
                                     {step === 1 && (
                                         <div className="space-y-6">
-                                            <Header title="About You" desc="Help us understand your academic environment." />
+                                            <Header title="Your Academic Context" desc="This helps us compare your experience with similar students." />
                                             <SelectGroup
-                                                label="Department"
+                                                label="Which department are you in?"
                                                 options={[
                                                     { val: "CS/IT", label: "CS / IT" },
                                                     { val: "ELECTRICAL/ELECTRONICS", label: "Electrical / Electronics" },
@@ -125,7 +126,7 @@ export default function CheckInPage() {
                                                 onChange={(v) => updateField("department", v)}
                                             />
                                             <SelectGroup
-                                                label="Current CGPA Range"
+                                                label="What's your current CGPA range?"
                                                 options={[
                                                     { val: "<7", label: "Below 7" },
                                                     { val: "7-8", label: "7 - 8" },
@@ -141,9 +142,9 @@ export default function CheckInPage() {
                                     {/* STEP 2: PLACEMENT STAGE */}
                                     {step === 2 && (
                                         <div className="space-y-6">
-                                            <Header title="Where are you right now?" desc="Different stages bring different pressures." />
+                                            <Header title="Placement Journey Stage" desc="Where are you in the placement process right now?" />
                                             <SelectGroup
-                                                label="Current Stage"
+                                                label="What stage are you at?"
                                                 options={[
                                                     { val: "online_tests", label: "Online Tests / Assessments" },
                                                     { val: "technical_interviews", label: "Technical Interviews" },
@@ -159,10 +160,10 @@ export default function CheckInPage() {
                                     {/* STEP 3: HABITS */}
                                     {step === 3 && (
                                         <div className="space-y-8">
-                                            <Header title="Preparation Habits" desc="Be honest. This is a judgement-free zone." />
+                                            <Header title="Your Preparation Routine" desc="No judgment—just honest tracking to help you understand patterns." />
 
                                             <div>
-                                                <label className="text-sm font-medium mb-4 block">Preparation Intensity</label>
+                                                <label className="text-sm font-medium mb-4 block">How many hours are you preparing daily?</label>
                                                 <div className="grid grid-cols-3 gap-3">
                                                     {[
                                                         { val: "low", label: "Light", desc: "< 2 hrs" },
@@ -181,7 +182,7 @@ export default function CheckInPage() {
                                             </div>
 
                                             <div>
-                                                <label className="text-sm font-medium mb-4 block">Consistency</label>
+                                                <label className="text-sm font-medium mb-4 block">How consistent have you been?</label>
                                                 <div className="grid grid-cols-3 gap-3">
                                                     {[
                                                         { val: "low", label: "Sporadic", desc: "Hard to stick to plan" },
@@ -204,10 +205,10 @@ export default function CheckInPage() {
                                     {/* STEP 4: EMOTION */}
                                     {step === 4 && (
                                         <div className="space-y-8">
-                                            <Header title="Emotional Check-in" desc="How is this affecting you?" />
+                                            <Header title="How Are You Feeling?" desc="Your mental well-being matters as much as your preparation." />
                                             <div>
                                                 <div className="flex justify-between mb-2">
-                                                    <span className="text-sm font-medium">Stress Level</span>
+                                                    <span className="text-sm font-medium">How stressed do you feel today?</span>
                                                     <span className="text-primary font-bold">{formData.stress}/10</span>
                                                 </div>
                                                 <Slider
@@ -223,7 +224,7 @@ export default function CheckInPage() {
                                             </div>
 
                                             <SelectGroup
-                                                label="How are you coping mainly?"
+                                                label="What's your main coping strategy?"
                                                 options={[
                                                     { val: "passive", label: "Distraction (Netflix, Sleeping)" },
                                                     { val: "active", label: "Talking, Exercise, Hobbies" },

@@ -1,12 +1,25 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 import json
 import os
 from contextlib import asynccontextmanager
+from pydantic import BaseModel
 
 from database import create_db_and_tables, get_session, engine
-from models import SurveyMetadata, StudentCheckIn
+from models import SurveyMetadata, StudentCheckIn, User
+from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
+from datetime import timedelta
+
+# Pydantic models for request bodies
+class UserCreate(BaseModel):
+    email: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
 # Load distributions on startup
 DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "survey_distributions.json")
@@ -86,8 +99,44 @@ def analyze_profile(stress: int, session: Session = Depends(get_session), depart
     }
     return analysis
 
+@app.post("/auth/register", response_model=Token)
+def register(user: UserCreate, session: Session = Depends(get_session)):
+    statement = select(User).where(User.email == user.email)
+    existing_user = session.exec(statement).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed_password = get_password_hash(user.password)
+    db_user = User(email=user.email, hashed_password=hashed_password)
+    session.add(db_user)
+    session.commit()
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/auth/login", response_model=Token)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+    statement = select(User).where(User.email == form_data.username) # OAuth2 form sends username/password
+    user = session.exec(statement).first()
+    
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
 @app.post("/check-in")
-def create_check_in(check_in: StudentCheckIn, session: Session = Depends(get_session)):
+def create_check_in(check_in: StudentCheckIn, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     session.add(check_in)
     session.commit()
     session.refresh(check_in)

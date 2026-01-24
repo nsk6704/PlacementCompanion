@@ -13,6 +13,10 @@
 # testing
 /coverage
 
+__pycache__/
+venv
+
+
 # next.js
 /.next/
 /out/

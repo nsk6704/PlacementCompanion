@@ -17,6 +17,7 @@ interface Comparison {
     message: string;
     user_value: number;
     population_mean: number;
+    percentile?: number;
 }
 
 interface Recommendation {
@@ -177,13 +178,18 @@ export default function ResultsPage() {
                                                         </div>
                                                     </div>
                                                     <div className="flex-1">
-                                                        <p className="text-lg font-semibold mb-2">{comp.message}</p>
-                                                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                                        <div className="flex items-center flex-wrap gap-2 mb-2">
+                                                            <p className="text-lg font-bold leading-tight">{comp.message}</p>
+                                                            {comp.percentile !== undefined && (
+                                                                <div className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-black uppercase">
+                                                                    {comp.percentile}th Percentile
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-4 text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
                                                             <span>Based on {comp.count} {comp.context}</span>
                                                             <span>•</span>
-                                                            <span>Your {comp.metric}: {comp.user_value}</span>
-                                                            <span>•</span>
-                                                            <span>Average: {comp.population_mean}</span>
+                                                            <span>Avg {comp.metric}: {comp.population_mean}</span>
                                                         </div>
                                                     </div>
                                                 </div>

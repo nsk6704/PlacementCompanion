@@ -50,6 +50,7 @@ export default function CheckInPage() {
     const [step, setStep] = useState(1);
     const [isAlreadyCheckedIn, setIsAlreadyCheckedIn] = useState(false);
     const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+    const [userBranch, setUserBranch] = useState("Other");
     const [validationError, setValidationError] = useState("");
     const [formData, setFormData] = useState<CheckInFormData>({
         cgpa: "",
@@ -85,6 +86,12 @@ export default function CheckInPage() {
                 const status = await apiRequest("/check-in/status");
                 if (!status.can_check_in) {
                     setIsAlreadyCheckedIn(true);
+                }
+
+                // Fetch user profile for accurate branch info
+                const user = await apiRequest("/auth/me");
+                if (user && user.branch) {
+                    setUserBranch(user.branch);
                 }
             } catch (error) {
                 console.error("Failed to check status:", error);
@@ -144,7 +151,7 @@ export default function CheckInPage() {
                 // Get user's branch from localStorage or fetch from API
                 // For now, we'll use a placeholder - in production, fetch from user profile
                 const payload = {
-                    department: "CS/IT", // This should come from user profile
+                    department: userBranch,
                     cgpa: formData.cgpa,
                     stage: formData.stage,
                     prep_hours: formData.prep_hours,

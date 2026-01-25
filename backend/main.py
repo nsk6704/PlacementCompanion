@@ -202,6 +202,15 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+@app.get("/auth/me")
+def read_users_me(current_user: User = Depends(get_current_user)):
+    return {
+        "email": current_user.email,
+        "branch": current_user.branch,
+        "is_active": current_user.is_active
+    }
+
+
 @app.get("/check-in/status")
 def get_check_in_status(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Check if the user has already checked in today"""

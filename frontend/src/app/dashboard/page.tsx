@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import PlotWrapper from "@/components/dashboard/PlotWrapper";
 import { motion } from "framer-motion";
 import { apiRequest } from "@/lib/api";
-import { TrendingUp, TrendingDown, Minus, Users, Target, Lightbulb, AlertCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Users, Target, Lightbulb, AlertCircle, Brain } from "lucide-react";
 
 export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
@@ -57,7 +57,7 @@ export default function DashboardPage() {
         values: Object.values(prepCounts) as number[],
         type: "pie" as const,
         marker: {
-            colors: ["#94A3B8", "#84A98C", "#E0F2F1", "#F3F4F6"]
+            colors: ["#52796F", "#84A98C", "#CAD2C5", "#2F3E46", "#354F52"]
         },
         hole: 0.4,
     };
@@ -119,90 +119,106 @@ export default function DashboardPage() {
                 {/* Insights Cards Row */}
                 {insights && (
                     <div className="grid gap-6 md:grid-cols-3 mb-6">
-                        {/* Comparative Analysis */}
-                        {insights.comparative && Object.keys(insights.comparative).length > 0 && (
+                        {/* Comparative Analysis - Science Driven */}
+                        {insights.comparative?.comparisons?.length > 0 && (
                             <Card className="border-none shadow-md">
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center gap-2">
                                         <Users className="h-5 w-5 text-primary" />
                                         <CardTitle className="text-lg">You vs. Peers</CardTitle>
                                     </div>
+                                    <CardDescription>Based on 130+ student survey</CardDescription>
                                 </CardHeader>
-                                <CardContent className="space-y-3">
-                                    {insights.comparative.stress_percentile && (
-                                        <div>
-                                            <p className="text-sm text-muted-foreground">Stress Percentile</p>
-                                            <p className="text-2xl font-bold">{Math.round(insights.comparative.stress_percentile)}th</p>
-                                        </div>
-                                    )}
-                                    {insights.comparative.vs_department && (
-                                        <div>
-                                            <p className="text-sm text-muted-foreground">vs. Department</p>
-                                            <p className={`text-sm font-semibold ${getComparisonColor(insights.comparative.vs_department)}`}>
-                                                {insights.comparative.vs_department}
-                                            </p>
-                                        </div>
-                                    )}
-                                    {insights.comparative.vs_stage && (
-                                        <div>
-                                            <p className="text-sm text-muted-foreground">vs. Stage</p>
-                                            <p className={`text-sm font-semibold ${getComparisonColor(insights.comparative.vs_stage)}`}>
-                                                {insights.comparative.vs_stage}
-                                            </p>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Trend Analysis */}
-                        {insights.trends && Object.keys(insights.trends).length > 0 && (
-                            <Card className="border-none shadow-md">
-                                <CardHeader className="pb-3">
-                                    <div className="flex items-center gap-2">
-                                        <Target className="h-5 w-5 text-primary" />
-                                        <CardTitle className="text-lg">Trends</CardTitle>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    {insights.trends.stress_direction && (
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-sm text-muted-foreground">Stress Direction</p>
-                                            <div className="flex items-center gap-2">
-                                                {getTrendIcon(insights.trends.stress_direction)}
-                                                <span className="text-sm font-semibold capitalize">{insights.trends.stress_direction}</span>
+                                <CardContent className="space-y-4">
+                                    {insights.comparative.comparisons.slice(0, 3).map((comp: any, idx: number) => (
+                                        <div key={idx} className="space-y-1">
+                                            <div className="flex justify-between items-end">
+                                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{comp.context}</p>
+                                                <span className="text-lg font-bold text-primary">{comp.percentage}%</span>
+                                            </div>
+                                            <p className="text-sm leading-tight text-foreground/80">Similar {comp.metric} levels as you</p>
+                                            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                                <motion.div
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${comp.percentage}%` }}
+                                                    className="h-full bg-primary"
+                                                />
                                             </div>
                                         </div>
-                                    )}
-                                    {insights.trends.consistency_score !== undefined && (
-                                        <div>
-                                            <p className="text-sm text-muted-foreground">Consistency</p>
-                                            <p className="text-sm font-semibold">{Math.round(insights.trends.consistency_score * 100)}%</p>
-                                        </div>
-                                    )}
-                                    {insights.trends.recent_spike && (
-                                        <div className="flex items-center gap-2 text-orange-600">
-                                            <AlertCircle className="h-4 w-4" />
-                                            <span className="text-sm font-semibold">Recent spike detected</span>
-                                        </div>
-                                    )}
+                                    ))}
                                 </CardContent>
                             </Card>
                         )}
 
-                        {/* Quick Stats */}
+                        {/* Metrics - Science Driven */}
                         <Card className="border-none shadow-md">
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-lg">Quick Stats</CardTitle>
+                                <div className="flex items-center gap-2">
+                                    <Brain className="h-5 w-5 text-primary" />
+                                    <CardTitle className="text-lg">Research Indices</CardTitle>
+                                </div>
                             </CardHeader>
-                            <CardContent className="space-y-3">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Total Check-ins</p>
-                                    <p className="text-2xl font-bold">{checkIns.length}</p>
+                            <CardContent className="space-y-5">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-3 rounded-lg bg-orange-50 border border-orange-100">
+                                        <p className="text-xs font-bold text-orange-600 uppercase">Anxiety Index</p>
+                                        <p className="text-2xl font-black text-orange-700">{insights.indices?.anxiety || "N/A"}</p>
+                                        <p className="text-[10px] text-orange-600/70 mt-1">Scale of 1-5</p>
+                                    </div>
+                                    <div className="p-3 rounded-lg bg-red-50 border border-red-100">
+                                        <p className="text-xs font-bold text-red-600 uppercase">Burnout Index</p>
+                                        <p className="text-2xl font-black text-red-700">{insights.indices?.burnout || "N/A"}</p>
+                                        <p className="text-[10px] text-red-600/70 mt-1">Scale of 1-5</p>
+                                    </div>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Latest Stress</p>
-                                    <p className="text-2xl font-bold">{checkIns[0]?.stress}/10</p>
+                                    <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Your Prep Profile</p>
+                                    <div className="px-3 py-2 rounded-md bg-muted/50 border border-muted-foreground/10">
+                                        <p className="text-sm font-semibold">{insights.indices?.prep_profile || "Calculating..."}</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Vital Trends & Stats */}
+                        <Card className="border-none shadow-md">
+                            <CardHeader className="pb-3">
+                                <div className="flex items-center gap-2">
+                                    <Target className="h-5 w-5 text-primary" />
+                                    <CardTitle className="text-lg">Vital Trends</CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {insights.trends?.stress_direction && (
+                                    <div className="flex items-center justify-between p-2 rounded-md bg-muted/30">
+                                        <p className="text-xs font-medium text-muted-foreground uppercase">Stress Path</p>
+                                        <div className="flex items-center gap-1.5">
+                                            {getTrendIcon(insights.trends.stress_direction)}
+                                            <span className="text-sm font-bold capitalize">{insights.trends.stress_direction}</span>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="text-center p-2">
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Consistency</p>
+                                        <p className="text-xl font-black text-primary">
+                                            {insights.trends?.consistency_score !== undefined ? `${Math.round(insights.trends.consistency_score * 100)}%` : "N/A"}
+                                        </p>
+                                    </div>
+                                    <div className="text-center p-2">
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Latest Stress</p>
+                                        <p className="text-xl font-black text-primary">{checkIns[0]?.stress || 0}/10</p>
+                                    </div>
+                                </div>
+                                {insights.trends?.recent_spike && (
+                                    <div className="mx-2 p-2 rounded bg-orange-100/50 flex items-center gap-2 text-orange-700 animate-pulse">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <span className="text-[11px] font-bold uppercase tracking-tight">Recent Stress Spike</span>
+                                    </div>
+                                )}
+                                <div className="pt-2 border-t flex justify-between items-center text-[10px] text-muted-foreground font-medium">
+                                    <span>Total Journey: {checkIns.length} Days</span>
+                                    <span>Last Active: {new Date(checkIns[0]?.created_at).toLocaleDateString()}</span>
                                 </div>
                             </CardContent>
                         </Card>
@@ -238,8 +254,8 @@ export default function DashboardPage() {
 
                     <Card className="border-none shadow-md">
                         <CardHeader>
-                            <CardTitle>Prep Intensity</CardTitle>
-                            <CardDescription>Distribution of your preparation hours</CardDescription>
+                            <CardTitle>Prep Intensity Distribution</CardTitle>
+                            <CardDescription>Your preparation hours profile across all check-ins</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="w-full h-[300px]">
@@ -250,6 +266,8 @@ export default function DashboardPage() {
                                         margin: { l: 20, r: 20, t: 20, b: 20 },
                                         paper_bgcolor: "rgba(0,0,0,0)",
                                         plot_bgcolor: "rgba(0,0,0,0)",
+                                        showlegend: true,
+                                        legend: { orientation: "h", y: -0.2 }
                                     }}
                                     style={{ width: "100%", height: "100%" }}
                                     useResizeHandler={true}

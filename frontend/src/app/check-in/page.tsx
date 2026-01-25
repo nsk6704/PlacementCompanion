@@ -50,22 +50,23 @@ export default function CheckInPage() {
     const [step, setStep] = useState(1);
     const [isAlreadyCheckedIn, setIsAlreadyCheckedIn] = useState(false);
     const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+    const [validationError, setValidationError] = useState("");
     const [formData, setFormData] = useState<CheckInFormData>({
         cgpa: "",
         stage: "",
         applications_count: "",
         challenging_stage: "",
-        anxiety_thinking: 3,
-        anxiety_overwhelmed: 3,
-        anxiety_rejections: 3,
-        anxiety_peer_comparison: 3,
-        anxiety_concentration: 3,
-        burnout_sleep: 3,
-        burnout_exhaustion: 3,
-        burnout_motivation: 3,
-        burnout_physical: 3,
-        prep_hours: "moderate",
-        prep_consistency: "moderate",
+        anxiety_thinking: 0,
+        anxiety_overwhelmed: 0,
+        anxiety_rejections: 0,
+        anxiety_peer_comparison: 0,
+        anxiety_concentration: 0,
+        burnout_sleep: 0,
+        burnout_exhaustion: 0,
+        burnout_motivation: 0,
+        burnout_physical: 0,
+        prep_hours: "",
+        prep_consistency: "",
         stress: 5,
         coping: "",
     });
@@ -95,7 +96,47 @@ export default function CheckInPage() {
         checkStatus();
     }, [router]);
 
+    const validateStep = () => {
+        setValidationError("");
+        switch (step) {
+            case 1:
+                if (!formData.cgpa) return "Please select your CGPA range.";
+                break;
+            case 2:
+                if (!formData.stage || !formData.applications_count || !formData.challenging_stage)
+                    return "Please answer all activity questions.";
+                break;
+            case 3:
+                if (formData.anxiety_thinking === 0 || formData.anxiety_overwhelmed === 0 || formData.anxiety_rejections === 0)
+                    return "Please rate all anxiety indicators.";
+                break;
+            case 4:
+                if (formData.anxiety_peer_comparison === 0 || formData.anxiety_concentration === 0)
+                    return "Please rate all anxiety indicators.";
+                break;
+            case 5:
+                if (formData.burnout_sleep === 0 || formData.burnout_exhaustion === 0 || formData.burnout_motivation === 0 || formData.burnout_physical === 0)
+                    return "Please rate all burnout indicators.";
+                break;
+            case 6:
+                if (!formData.prep_hours || !formData.prep_consistency)
+                    return "Please select your preparation habits.";
+                break;
+            case 7:
+                if (!formData.stress || !formData.coping)
+                    return "Please rate your stress and select a coping strategy.";
+                break;
+        }
+        return "";
+    };
+
     const handleNext = async () => {
+        const error = validateStep();
+        if (error) {
+            setValidationError(error);
+            return;
+        }
+
         if (step < totalSteps) {
             setStep(step + 1);
         } else {
@@ -141,6 +182,7 @@ export default function CheckInPage() {
 
     const updateField = (field: keyof CheckInFormData, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+        setValidationError("");
     }
 
     if (isLoadingStatus) {
@@ -242,6 +284,17 @@ export default function CheckInPage() {
 
                         <CardContent className="pt-6 min-h-[400px] flex flex-col justify-between">
                             <AnimatePresence mode="wait">
+                                <div className="mb-4 h-6">
+                                    {validationError && (
+                                        <motion.p
+                                            initial={{ opacity: 0, y: -10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className="text-red-500 text-sm font-medium text-center"
+                                        >
+                                            {validationError}
+                                        </motion.p>
+                                    )}
+                                </div>
                                 <motion.div
                                     key={step}
                                     initial={{ opacity: 0, x: 20 }}

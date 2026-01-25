@@ -9,6 +9,10 @@ import { Slider } from "@/components/ui/slider";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, ArrowRight, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { apiRequest } from "@/lib/api";
+import Link from "next/link";
+import { BookOpen, LineChart, Sparkles } from "lucide-react";
 
 interface CheckInFormData {
     // Academic context
@@ -44,6 +48,8 @@ interface CheckInFormData {
 export default function CheckInPage() {
     const router = useRouter();
     const [step, setStep] = useState(1);
+    const [isAlreadyCheckedIn, setIsAlreadyCheckedIn] = useState(false);
+    const [isLoadingStatus, setIsLoadingStatus] = useState(true);
     const [formData, setFormData] = useState<CheckInFormData>({
         cgpa: "",
         stage: "",
@@ -66,12 +72,28 @@ export default function CheckInPage() {
 
     const totalSteps = 7;
 
-    // Check auth on mount
-    if (typeof window !== 'undefined' && !localStorage.getItem('token')) {
-        router.push('/login');
-    }
+    // Check auth and daily status on mount
+    useEffect(() => {
+        if (!localStorage.getItem('token')) {
+            router.push('/login');
+            return;
+        }
 
-    const { apiRequest } = require("@/lib/api");
+        const checkStatus = async () => {
+            try {
+                const status = await apiRequest("/check-in/status");
+                if (!status.can_check_in) {
+                    setIsAlreadyCheckedIn(true);
+                }
+            } catch (error) {
+                console.error("Failed to check status:", error);
+            } finally {
+                setIsLoadingStatus(false);
+            }
+        };
+
+        checkStatus();
+    }, [router]);
 
     const handleNext = async () => {
         if (step < totalSteps) {
@@ -119,6 +141,79 @@ export default function CheckInPage() {
 
     const updateField = (field: keyof CheckInFormData, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+    }
+
+    if (isLoadingStatus) {
+        return (
+            <div className="min-h-screen bg-muted/20">
+                <Navbar />
+                <div className="container mx-auto px-4 py-32 text-center">
+                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
+                    <p className="mt-4 text-muted-foreground">Preparing your daily reflection...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (isAlreadyCheckedIn) {
+        return (
+            <div className="min-h-screen bg-muted/20 pb-20">
+                <Navbar />
+                <div className="container mx-auto px-4 py-12 max-w-2xl">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="text-center space-y-8 py-12"
+                    >
+                        <div className="inline-flex items-center justify-center p-4 bg-primary/10 text-primary rounded-full mb-4">
+                            <Sparkles className="h-10 w-10" />
+                        </div>
+                        <div className="space-y-4">
+                            <h1 className="text-4xl font-bold tracking-tight">Daily Reflection Complete!</h1>
+                            <p className="text-xl text-muted-foreground max-w-lg mx-auto">
+                                You've already checked in for today. Taking one moment of daily reflection is a powerful way to manage placement stress.
+                            </p>
+                        </div>
+
+                        <div className="grid gap-4 mt-8">
+                            <Card className="border-none shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                                <CardContent className="p-0">
+                                    <Link href="/dashboard" className="flex items-center p-6 gap-4 text-left group">
+                                        <div className="p-3 bg-primary/10 text-primary rounded-lg group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                            <LineChart className="h-6 w-6" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="font-bold">View Progress</h3>
+                                            <p className="text-sm text-muted-foreground">See how your stress and metrics have changed over time.</p>
+                                        </div>
+                                    </Link>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="border-none shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                                <CardContent className="p-0">
+                                    <Link href="/guide" className="flex items-center p-6 gap-4 text-left group">
+                                        <div className="p-3 bg-secondary/10 text-secondary rounded-lg group-hover:bg-secondary group-hover:text-secondary-foreground transition-colors">
+                                            <BookOpen className="h-6 w-6" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="font-bold">Explore Guides</h3>
+                                            <p className="text-sm text-muted-foreground">Browse techniques for managing interview anxiety and burnout.</p>
+                                        </div>
+                                    </Link>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <div className="pt-8">
+                            <p className="text-sm text-muted-foreground">
+                                Come back tomorrow for your next check-in. Consistency is key!
+                            </p>
+                        </div>
+                    </motion.div>
+                </div>
+            </div>
+        );
     }
 
     return (

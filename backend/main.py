@@ -17,6 +17,7 @@ from datetime import timedelta
 class UserCreate(BaseModel):
     email: str
     password: str
+    branch: str
 
 class Token(BaseModel):
     access_token: str
@@ -31,20 +32,67 @@ async def lifespan(app: FastAPI):
     create_db_and_tables()
     
     with Session(engine) as session:
-        # MIGRATION: Ensure user_email column exists
+        # MIGRATION: Ensure all new columns exist
         try:
-            from sqlalchemy import inspect, String
+            from sqlalchemy import inspect, String, Integer
+            from sqlalchemy import text
             inspector = inspect(engine)
-            columns = [col['name'] for col in inspector.get_columns('studentcheckin')]
             
-            if 'user_email' not in columns:
+            # Check StudentCheckIn table columns
+            # In Postgres, table names are usually lowercase. Using "studentcheckin" without quotes for inspector
+            checkin_columns = [col['name'] for col in inspector.get_columns('studentcheckin')]
+            
+            # Migrate user_email if needed
+            if 'user_email' not in checkin_columns:
                 print("Adding user_email column to studentcheckin table...")
-                from sqlalchemy import text
-                session.exec(text("ALTER TABLE studentcheckin ADD COLUMN user_email VARCHAR"))
+                session.exec(text('ALTER TABLE "studentcheckin" ADD COLUMN user_email VARCHAR'))
                 session.commit()
                 print("Migration: Added user_email column successfully.")
-            else:
-                print("Migration: user_email column already exists.")
+            
+            # Migrate anxiety indicator columns
+            anxiety_columns = [
+                'anxiety_thinking', 'anxiety_overwhelmed', 'anxiety_rejections',
+                'anxiety_peer_comparison', 'anxiety_concentration'
+            ]
+            for col in anxiety_columns:
+                if col not in checkin_columns:
+                    print(f"Adding {col} column to studentcheckin table...")
+                    session.exec(text(f'ALTER TABLE "studentcheckin" ADD COLUMN {col} INTEGER'))
+                    session.commit()
+            
+            # Migrate burnout indicator columns
+            burnout_columns = [
+                'burnout_sleep', 'burnout_exhaustion', 'burnout_motivation', 'burnout_physical'
+            ]
+            for col in burnout_columns:
+                if col not in checkin_columns:
+                    print(f"Adding {col} column to studentcheckin table...")
+                    session.exec(text(f'ALTER TABLE "studentcheckin" ADD COLUMN {col} INTEGER'))
+                    session.commit()
+            
+            # Migrate additional context columns
+            if 'applications_count' not in checkin_columns:
+                print("Adding applications_count column to studentcheckin table...")
+                session.exec(text('ALTER TABLE "studentcheckin" ADD COLUMN applications_count VARCHAR'))
+                session.commit()
+            
+            if 'challenging_stage' not in checkin_columns:
+                print("Adding challenging_stage column to studentcheckin table...")
+                session.exec(text('ALTER TABLE "studentcheckin" ADD COLUMN challenging_stage VARCHAR'))
+                session.commit()
+            
+            # Check User table columns
+            # Use "user" in quotes for Postgres because it's a reserved word
+            user_columns = [col['name'] for col in inspector.get_columns('user')]
+            
+            # Migrate branch column to User table
+            if 'branch' not in user_columns:
+                print("Adding branch column to user table...")
+                session.exec(text('ALTER TABLE "user" ADD COLUMN branch VARCHAR'))
+                session.commit()
+                print("Migration: Added branch column successfully.")
+            
+            print("All migrations completed successfully.")
         except Exception as e:
             print(f"Migration warning: {e}")
             session.rollback()
@@ -126,7 +174,7 @@ def register(user: UserCreate, session: Session = Depends(get_session)):
         raise HTTPException(status_code=400, detail="Email already registered")
     
     hashed_password = get_password_hash(user.password)
-    db_user = User(email=user.email, hashed_password=hashed_password)
+    db_user = User(email=user.email, hashed_password=hashed_password, branch=user.branch)
     session.add(db_user)
     session.commit()
     
@@ -189,7 +237,21 @@ def get_personalized_insights(current_user: User = Depends(get_current_user), se
             "prep_hours": c.prep_hours,
             "prep_consistency": c.prep_consistency,
             "coping": c.coping,
-            "created_at": c.created_at.isoformat()
+            "created_at": c.created_at.isoformat(),
+            # Anxiety indicators
+            "anxiety_thinking": c.anxiety_thinking,
+            "anxiety_overwhelmed": c.anxiety_overwhelmed,
+            "anxiety_rejections": c.anxiety_rejections,
+            "anxiety_peer_comparison": c.anxiety_peer_comparison,
+            "anxiety_concentration": c.anxiety_concentration,
+            # Burnout indicators
+            "burnout_sleep": c.burnout_sleep,
+            "burnout_exhaustion": c.burnout_exhaustion,
+            "burnout_motivation": c.burnout_motivation,
+            "burnout_physical": c.burnout_physical,
+            # Additional context
+            "applications_count": c.applications_count,
+            "challenging_stage": c.challenging_stage
         }
         for c in checkins
     ]

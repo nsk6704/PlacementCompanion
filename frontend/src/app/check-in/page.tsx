@@ -4,50 +4,101 @@ import { useState } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, ArrowRight, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { UserProfile } from "@/lib/insightsEngine";
+
+interface CheckInFormData {
+    // Academic context
+    cgpa: string;
+    stage: string;
+
+    // Placement activity
+    applications_count: string;
+    challenging_stage: string;
+
+    // Anxiety indicators (1-5 scale)
+    anxiety_thinking: number;
+    anxiety_overwhelmed: number;
+    anxiety_rejections: number;
+    anxiety_peer_comparison: number;
+    anxiety_concentration: number;
+
+    // Burnout indicators (1-5 scale)
+    burnout_sleep: number;
+    burnout_exhaustion: number;
+    burnout_motivation: number;
+    burnout_physical: number;
+
+    // Preparation habits
+    prep_hours: string;
+    prep_consistency: string;
+
+    // Stress & coping
+    stress: number;
+    coping: string;
+}
 
 export default function CheckInPage() {
     const router = useRouter();
     const [step, setStep] = useState(1);
-    const [formData, setFormData] = useState<UserProfile>({
-        stress: 5,
-        prepHours: "moderate",
-        prepConsistency: "moderate",
-        department: "",
+    const [formData, setFormData] = useState<CheckInFormData>({
         cgpa: "",
         stage: "",
+        applications_count: "",
+        challenging_stage: "",
+        anxiety_thinking: 3,
+        anxiety_overwhelmed: 3,
+        anxiety_rejections: 3,
+        anxiety_peer_comparison: 3,
+        anxiety_concentration: 3,
+        burnout_sleep: 3,
+        burnout_exhaustion: 3,
+        burnout_motivation: 3,
+        burnout_physical: 3,
+        prep_hours: "moderate",
+        prep_consistency: "moderate",
+        stress: 5,
         coping: "",
     });
 
-    const totalSteps = 4;
+    const totalSteps = 7;
 
     // Check auth on mount
     if (typeof window !== 'undefined' && !localStorage.getItem('token')) {
         router.push('/login');
     }
 
-    const { apiRequest } = require("@/lib/api"); // Lazy load to avoid server-side issues if any
+    const { apiRequest } = require("@/lib/api");
 
     const handleNext = async () => {
         if (step < totalSteps) {
             setStep(step + 1);
         } else {
             try {
-                // Prepare data for backend (snake_case conversion if needed, but our model uses snake_case keys in backend too? 
-                // Let's check model: department, cgpa, stage, prep_hours, prep_consistency, stress, coping)
+                // Get user's branch from localStorage or fetch from API
+                // For now, we'll use a placeholder - in production, fetch from user profile
                 const payload = {
-                    department: formData.department,
+                    department: "CS/IT", // This should come from user profile
                     cgpa: formData.cgpa,
                     stage: formData.stage,
-                    prep_hours: formData.prepHours,
-                    prep_consistency: formData.prepConsistency,
+                    prep_hours: formData.prep_hours,
+                    prep_consistency: formData.prep_consistency,
                     stress: formData.stress,
-                    coping: formData.coping
+                    coping: formData.coping,
+                    anxiety_thinking: formData.anxiety_thinking,
+                    anxiety_overwhelmed: formData.anxiety_overwhelmed,
+                    anxiety_rejections: formData.anxiety_rejections,
+                    anxiety_peer_comparison: formData.anxiety_peer_comparison,
+                    anxiety_concentration: formData.anxiety_concentration,
+                    burnout_sleep: formData.burnout_sleep,
+                    burnout_exhaustion: formData.burnout_exhaustion,
+                    burnout_motivation: formData.burnout_motivation,
+                    burnout_physical: formData.burnout_physical,
+                    applications_count: formData.applications_count,
+                    challenging_stage: formData.challenging_stage
                 };
 
                 await apiRequest("/check-in", {
@@ -55,15 +106,9 @@ export default function CheckInPage() {
                     body: JSON.stringify(payload)
                 });
 
-                // Convert collected data into query params for the results page
-                const params = new URLSearchParams();
-                Object.entries(formData).forEach(([key, value]) => {
-                    if (value) params.append(key, String(value));
-                });
-                router.push(`/check-in/results?${params.toString()}`);
+                router.push(`/check-in/results`);
             } catch (error) {
                 console.error("Failed to submit check-in:", error);
-                // Optionally show error to user
             }
         }
     };
@@ -72,7 +117,7 @@ export default function CheckInPage() {
         if (step > 1) setStep(step - 1);
     }
 
-    const updateField = (field: keyof UserProfile, value: any) => {
+    const updateField = (field: keyof CheckInFormData, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     }
 
@@ -87,7 +132,7 @@ export default function CheckInPage() {
                 >
                     <div className="mb-8 text-center">
                         <h1 className="text-3xl font-bold tracking-tight mb-2">Daily Check-In</h1>
-                        <p className="text-muted-foreground">A quick reflection to track your journey and get personalized insights.</p>
+                        <p className="text-muted-foreground">A comprehensive reflection to track your journey and get personalized insights.</p>
                         <p className="text-xs text-muted-foreground/70 mt-2">Based on research with 130+ students across departments</p>
                     </div>
 
@@ -115,23 +160,13 @@ export default function CheckInPage() {
                                         <div className="space-y-6">
                                             <Header title="Your Academic Context" desc="This helps us compare your experience with similar students." />
                                             <SelectGroup
-                                                label="Which department are you in?"
-                                                options={[
-                                                    { val: "CS/IT", label: "CS / IT" },
-                                                    { val: "ELECTRICAL/ELECTRONICS", label: "Electrical / Electronics" },
-                                                    { val: "MECHANICAL", label: "Mechanical" },
-                                                    { val: "OTHER", label: "Other" },
-                                                ]}
-                                                value={formData.department}
-                                                onChange={(v) => updateField("department", v)}
-                                            />
-                                            <SelectGroup
                                                 label="What's your current CGPA range?"
                                                 options={[
-                                                    { val: "<7", label: "Below 7" },
-                                                    { val: "7-8", label: "7 - 8" },
-                                                    { val: "8-9", label: "8 - 9" },
-                                                    { val: "9+", label: "9+" },
+                                                    { val: "Below 6", label: "Below 6" },
+                                                    { val: "6.0–6.9", label: "6.0 - 6.9" },
+                                                    { val: "7.0–7.9", label: "7.0 - 7.9" },
+                                                    { val: "8.0–8.9", label: "8.0 - 8.9" },
+                                                    { val: "9.0 and above", label: "9.0 and above" },
                                                 ]}
                                                 value={formData.cgpa}
                                                 onChange={(v) => updateField("cgpa", v)}
@@ -139,26 +174,113 @@ export default function CheckInPage() {
                                         </div>
                                     )}
 
-                                    {/* STEP 2: PLACEMENT STAGE */}
+                                    {/* STEP 2: PLACEMENT ACTIVITY */}
                                     {step === 2 && (
                                         <div className="space-y-6">
-                                            <Header title="Placement Journey Stage" desc="Where are you in the placement process right now?" />
+                                            <Header title="Placement Activity" desc="Tell us about your placement journey so far." />
                                             <SelectGroup
-                                                label="What stage are you at?"
+                                                label="What stage are you currently at?"
                                                 options={[
-                                                    { val: "online_tests", label: "Online Tests / Assessments" },
-                                                    { val: "technical_interviews", label: "Technical Interviews" },
-                                                    { val: "hr_round", label: "HR Round" },
-                                                    { val: "still_applying", label: "Still Applying (No responses)" },
+                                                    { val: "Online tests or assessments", label: "Online Tests / Assessments" },
+                                                    { val: "Technical Interviews", label: "Technical Interviews" },
+                                                    { val: "HR/Managerial Interviews", label: "HR / Managerial Round" },
                                                 ]}
                                                 value={formData.stage}
                                                 onChange={(v) => updateField("stage", v)}
                                             />
+                                            <SelectGroup
+                                                label="Approximately how many companies have you applied to?"
+                                                options={[
+                                                    { val: "0-10", label: "0 - 10 companies" },
+                                                    { val: "11-25", label: "11 - 25 companies" },
+                                                    { val: "26-50", label: "26 - 50 companies" },
+                                                    { val: "50+", label: "50+ companies" },
+                                                ]}
+                                                value={formData.applications_count}
+                                                onChange={(v) => updateField("applications_count", v)}
+                                            />
+                                            <SelectGroup
+                                                label="Which stage do you find most challenging?"
+                                                options={[
+                                                    { val: "online_tests", label: "Online Tests" },
+                                                    { val: "technical", label: "Technical Interviews" },
+                                                    { val: "hr", label: "HR Round" },
+                                                    { val: "all_equally", label: "All Equally Challenging" },
+                                                ]}
+                                                value={formData.challenging_stage}
+                                                onChange={(v) => updateField("challenging_stage", v)}
+                                            />
                                         </div>
                                     )}
 
-                                    {/* STEP 3: HABITS */}
+                                    {/* STEP 3: ANXIETY INDICATORS */}
                                     {step === 3 && (
+                                        <div className="space-y-6">
+                                            <Header title="Anxiety & Pressure" desc="Rate how much you agree with these statements (1 = Strongly Disagree, 5 = Strongly Agree)" />
+                                            <LikertScale
+                                                label="I feel anxious when thinking about placements"
+                                                value={formData.anxiety_thinking}
+                                                onChange={(v) => updateField("anxiety_thinking", v)}
+                                            />
+                                            <LikertScale
+                                                label="I feel overwhelmed by the amount of preparation required"
+                                                value={formData.anxiety_overwhelmed}
+                                                onChange={(v) => updateField("anxiety_overwhelmed", v)}
+                                            />
+                                            <LikertScale
+                                                label="Rejections negatively affect my motivation"
+                                                value={formData.anxiety_rejections}
+                                                onChange={(v) => updateField("anxiety_rejections", v)}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* STEP 4: MORE ANXIETY INDICATORS */}
+                                    {step === 4 && (
+                                        <div className="space-y-6">
+                                            <Header title="Anxiety & Pressure (continued)" desc="Rate how much you agree with these statements" />
+                                            <LikertScale
+                                                label="Comparing myself with peers increases pressure"
+                                                value={formData.anxiety_peer_comparison}
+                                                onChange={(v) => updateField("anxiety_peer_comparison", v)}
+                                            />
+                                            <LikertScale
+                                                label="I find it hard to concentrate due to placement-related stress"
+                                                value={formData.anxiety_concentration}
+                                                onChange={(v) => updateField("anxiety_concentration", v)}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* STEP 5: BURNOUT INDICATORS */}
+                                    {step === 5 && (
+                                        <div className="space-y-6">
+                                            <Header title="Burnout Symptoms" desc="During placement preparation, to what extent do you experience the following?" />
+                                            <LikertScale
+                                                label="Reduced sleep quality"
+                                                value={formData.burnout_sleep}
+                                                onChange={(v) => updateField("burnout_sleep", v)}
+                                            />
+                                            <LikertScale
+                                                label="Mental exhaustion even after rest"
+                                                value={formData.burnout_exhaustion}
+                                                onChange={(v) => updateField("burnout_exhaustion", v)}
+                                            />
+                                            <LikertScale
+                                                label="Loss of motivation"
+                                                value={formData.burnout_motivation}
+                                                onChange={(v) => updateField("burnout_motivation", v)}
+                                            />
+                                            <LikertScale
+                                                label="Physical fatigue or headaches"
+                                                value={formData.burnout_physical}
+                                                onChange={(v) => updateField("burnout_physical", v)}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* STEP 6: PREPARATION HABITS */}
+                                    {step === 6 && (
                                         <div className="space-y-8">
                                             <Header title="Your Preparation Routine" desc="No judgment—just honest tracking to help you understand patterns." />
 
@@ -172,8 +294,8 @@ export default function CheckInPage() {
                                                     ].map((opt) => (
                                                         <TileOption
                                                             key={opt.val}
-                                                            selected={formData.prepHours === opt.val}
-                                                            onClick={() => updateField("prepHours", opt.val)}
+                                                            selected={formData.prep_hours === opt.val}
+                                                            onClick={() => updateField("prep_hours", opt.val)}
                                                             label={opt.label}
                                                             sub={opt.desc}
                                                         />
@@ -191,8 +313,8 @@ export default function CheckInPage() {
                                                     ].map((opt) => (
                                                         <TileOption
                                                             key={opt.val}
-                                                            selected={formData.prepConsistency === opt.val}
-                                                            onClick={() => updateField("prepConsistency", opt.val)}
+                                                            selected={formData.prep_consistency === opt.val}
+                                                            onClick={() => updateField("prep_consistency", opt.val)}
                                                             label={opt.label}
                                                             sub={opt.desc}
                                                         />
@@ -202,8 +324,8 @@ export default function CheckInPage() {
                                         </div>
                                     )}
 
-                                    {/* STEP 4: EMOTION */}
-                                    {step === 4 && (
+                                    {/* STEP 7: STRESS & COPING */}
+                                    {step === 7 && (
                                         <div className="space-y-8">
                                             <Header title="How Are You Feeling?" desc="Your mental well-being matters as much as your preparation." />
                                             <div>
@@ -212,7 +334,7 @@ export default function CheckInPage() {
                                                     <span className="text-primary font-bold">{formData.stress}/10</span>
                                                 </div>
                                                 <Slider
-                                                    value={formData.stress || 5}
+                                                    value={formData.stress}
                                                     max={10}
                                                     onValueChange={(v) => updateField("stress", v)}
                                                 />
@@ -256,7 +378,7 @@ export default function CheckInPage() {
     );
 }
 
-// Sub-components for cleaner code
+// Sub-components
 function Header({ title, desc }: { title: string, desc: string }) {
     return (
         <div className="mb-6">
@@ -300,6 +422,37 @@ function TileOption({ label, sub, selected, onClick }: { label: string, sub: str
         >
             <div className="font-semibold text-sm">{label}</div>
             <div className="text-xs text-muted-foreground mt-1">{sub}</div>
+        </div>
+    )
+}
+
+function LikertScale({ label, value, onChange }: { label: string, value: number, onChange: (v: number) => void }) {
+    return (
+        <div className="space-y-3">
+            <div className="flex justify-between items-start">
+                <label className="text-sm font-medium flex-1">{label}</label>
+                <span className="text-primary font-bold ml-4">{value}/5</span>
+            </div>
+            <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((num) => (
+                    <button
+                        key={num}
+                        onClick={() => onChange(num)}
+                        className={cn(
+                            "flex-1 h-12 rounded-lg border-2 transition-all font-semibold",
+                            value === num
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-input hover:border-primary/50"
+                        )}
+                    >
+                        {num}
+                    </button>
+                ))}
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Strongly Disagree</span>
+                <span>Strongly Agree</span>
+            </div>
         </div>
     )
 }

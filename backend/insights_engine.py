@@ -62,6 +62,74 @@ def detect_spike(values: List[float], threshold: float = 1.5) -> bool:
     latest = recent[-1]
     return latest > (baseline + threshold * std_dev)
 
+def calculate_similarity_percentage(
+    user_value: float,
+    distribution: Dict[str, Any],
+    tolerance: float = 0.5
+) -> Optional[Dict[str, Any]]:
+    """
+    Calculate what percentage of the population is in a similar range
+    
+    Args:
+        user_value: User's value (e.g., anxiety index)
+        distribution: Distribution stats from survey (mean, std, count)
+        tolerance: Range tolerance in standard deviations
+    
+    Returns:
+        Dictionary with percentage and context, or None if insufficient data
+    """
+    if not distribution or distribution.get('count', 0) == 0:
+        return None
+    
+    mean = distribution.get('mean')
+    std = distribution.get('std')
+    count = distribution.get('count', 0)
+    
+    if mean is None or std is None or std == 0:
+        # If no std, use simple range check
+        if mean is not None and abs(user_value - mean) <= tolerance:
+            return {
+                'percentage': 50,  # Rough estimate
+                'count': count,
+                'is_similar': True
+            }
+        return None
+    
+    # Calculate how many standard deviations away from mean
+    z_score = abs(user_value - mean) / std
+    
+    # If within tolerance, calculate approximate percentage
+    # Using normal distribution approximation
+    if z_score <= tolerance:
+        # Within tolerance range - estimate percentage
+        # For ±0.5 std, roughly 38% of population
+        # For ±1.0 std, roughly 68% of population
+        percentage = min(100, int(38 + (tolerance - 0.5) * 30))
+        return {
+            'percentage': percentage,
+            'count': count,
+            'is_similar': True,
+            'z_score': z_score
+        }
+    elif z_score <= 1.0:
+        # Somewhat similar
+        percentage = max(20, int(68 - (z_score - tolerance) * 40))
+        return {
+            'percentage': percentage,
+            'count': count,
+            'is_similar': True,
+            'z_score': z_score
+        }
+    else:
+        # Not very similar
+        return {
+            'percentage': 10,
+            'count': count,
+            'is_similar': False,
+            'z_score': z_score
+        }
+
+
 def generate_personalized_insights(
     user_checkins: List[Dict[str, Any]],
     survey_distributions: Dict[str, Any]
@@ -92,31 +160,132 @@ def generate_personalized_insights(
     latest = user_checkins[-1]
     stress_values = [c['stress'] for c in user_checkins]
     
-    # === COMPARATIVE ANALYSIS ===
-    comparative = {}
+    # === CALCULATE INDICES FROM INDIVIDUAL QUESTIONS ===
+    anxiety_index = None
+    burnout_index = None
+    
+    # Calculate anxiety index if questions are available
+    anxiety_questions = [
+        latest.get('anxiety_thinking'),
+        latest.get('anxiety_overwhelmed'),
+        latest.get('anxiety_rejections'),
+        latest.get('anxiety_peer_comparison'),
+        latest.get('anxiety_concentration')
+    ]
+    if all(q is not None for q in anxiety_questions):
+        anxiety_index = statistics.mean(anxiety_questions)
+    
+    # Calculate burnout index if questions are available
+    burnout_questions = [
+        latest.get('burnout_sleep'),
+        latest.get('burnout_exhaustion'),
+        latest.get('burnout_motivation'),
+        latest.get('burnout_physical')
+    ]
+    if all(q is not None for q in burnout_questions):
+        burnout_index = statistics.mean(burnout_questions)
+    
+    # === COMPARATIVE ANALYSIS WITH PERCENTAGES ===
+    comparative = {
+        "comparisons": []  # List of comparative insights with percentages
+    }
     
     # Overall comparison
-    overall_anxiety = survey_distributions.get('overall', {}).get('anxiety', {})
-    stress_percentile = calculate_percentile(latest['stress'], overall_anxiety)
-    if stress_percentile:
-        comparative['stress_percentile'] = stress_percentile
-        comparative['vs_population'] = "higher" if stress_percentile > 60 else "lower" if stress_percentile < 40 else "similar"
+    if anxiety_index is not None:
+        overall_anxiety = survey_distributions.get('overall', {}).get('anxiety', {})
+        similarity = calculate_similarity_percentage(anxiety_index, overall_anxiety, tolerance=0.6)
+        if similarity and similarity['is_similar']:
+            comparative["comparisons"].append({
+                "context": "overall population",
+                "metric": "anxiety",
+                "percentage": similarity['percentage'],
+                "count": similarity['count'],
+                "message": f"{similarity['percentage']}% of students experience similar anxiety levels",
+                "user_value": round(anxiety_index, 1),
+                "population_mean": round(overall_anxiety.get('mean', 0), 1)
+            })
+    
+    if burnout_index is not None:
+        overall_burnout = survey_distributions.get('overall', {}).get('burnout', {})
+        similarity = calculate_similarity_percentage(burnout_index, overall_burnout, tolerance=0.6)
+        if similarity and similarity['is_similar']:
+            comparative["comparisons"].append({
+                "context": "overall population",
+                "metric": "burnout",
+                "percentage": similarity['percentage'],
+                "count": similarity['count'],
+                "message": f"{similarity['percentage']}% of students experience similar burnout levels",
+                "user_value": round(burnout_index, 1),
+                "population_mean": round(overall_burnout.get('mean', 0), 1)
+            })
     
     # Department comparison
     dept = latest.get('department')
     if dept and dept in survey_distributions.get('department', {}):
-        dept_dist = survey_distributions['department'][dept]['anxiety']
-        dept_percentile = calculate_percentile(latest['stress'], dept_dist)
-        if dept_percentile:
-            comparative['vs_department'] = "higher" if dept_percentile > 60 else "lower" if dept_percentile < 40 else "similar"
+        dept_data = survey_distributions['department'][dept]
+        
+        if anxiety_index is not None and 'anxiety' in dept_data:
+            similarity = calculate_similarity_percentage(anxiety_index, dept_data['anxiety'], tolerance=0.6)
+            if similarity and similarity['is_similar']:
+                comparative["comparisons"].append({
+                    "context": f"{dept} students",
+                    "metric": "anxiety",
+                    "percentage": similarity['percentage'],
+                    "count": similarity['count'],
+                    "message": f"{similarity['percentage']}% of {dept} students experience similar anxiety",
+                    "user_value": round(anxiety_index, 1),
+                    "population_mean": round(dept_data['anxiety'].get('mean', 0), 1)
+                })
+        
+        if burnout_index is not None and 'burnout' in dept_data:
+            similarity = calculate_similarity_percentage(burnout_index, dept_data['burnout'], tolerance=0.6)
+            if similarity and similarity['is_similar']:
+                comparative["comparisons"].append({
+                    "context": f"{dept} students",
+                    "metric": "burnout",
+                    "percentage": similarity['percentage'],
+                    "count": similarity['count'],
+                    "message": f"{similarity['percentage']}% of {dept} students experience similar burnout",
+                    "user_value": round(burnout_index, 1),
+                    "population_mean": round(dept_data['burnout'].get('mean', 0), 1)
+                })
+    
+    # CGPA comparison
+    cgpa = latest.get('cgpa')
+    if cgpa and cgpa in survey_distributions.get('cgpa', {}):
+        cgpa_data = survey_distributions['cgpa'][cgpa]
+        
+        if anxiety_index is not None and 'anxiety' in cgpa_data:
+            similarity = calculate_similarity_percentage(anxiety_index, cgpa_data['anxiety'], tolerance=0.6)
+            if similarity and similarity['is_similar']:
+                comparative["comparisons"].append({
+                    "context": f"students with {cgpa} CGPA",
+                    "metric": "anxiety",
+                    "percentage": similarity['percentage'],
+                    "count": similarity['count'],
+                    "message": f"{similarity['percentage']}% of students with {cgpa} CGPA feel similar anxiety",
+                    "user_value": round(anxiety_index, 1),
+                    "population_mean": round(cgpa_data['anxiety'].get('mean', 0), 1)
+                })
     
     # Stage comparison
     stage = latest.get('stage')
     if stage and stage in survey_distributions.get('stage', {}):
-        stage_dist = survey_distributions['stage'][stage]['anxiety']
-        stage_percentile = calculate_percentile(latest['stress'], stage_dist)
-        if stage_percentile:
-            comparative['vs_stage'] = "higher" if stage_percentile > 60 else "lower" if stage_percentile < 40 else "similar"
+        stage_data = survey_distributions['stage'][stage]
+        
+        if anxiety_index is not None and 'anxiety' in stage_data:
+            similarity = calculate_similarity_percentage(anxiety_index, stage_data['anxiety'], tolerance=0.6)
+            if similarity and similarity['is_similar']:
+                stage_label = stage.replace('_', ' ').title()
+                comparative["comparisons"].append({
+                    "context": f"students at {stage_label} stage",
+                    "metric": "anxiety",
+                    "percentage": similarity['percentage'],
+                    "count": similarity['count'],
+                    "message": f"{similarity['percentage']}% of students at {stage_label} stage experience similar anxiety",
+                    "user_value": round(anxiety_index, 1),
+                    "population_mean": round(stage_data['anxiety'].get('mean', 0), 1)
+                })
     
     # === TREND ANALYSIS ===
     trends = {}
@@ -148,6 +317,24 @@ def generate_personalized_insights(
             "priority": "high",
             "message": "Your stress level is quite high. This is common during placement season, but it's important to address it.",
             "action": "Consider taking short breaks, practicing deep breathing, or talking to someone you trust."
+        })
+    
+    # High anxiety index
+    if anxiety_index and anxiety_index >= 4.0:
+        recommendations.append({
+            "category": "anxiety_support",
+            "priority": "high",
+            "message": f"Your anxiety index ({round(anxiety_index, 1)}/5) indicates significant placement-related anxiety.",
+            "action": "Remember that many students feel this way. Consider structured preparation and regular check-ins with peers or mentors."
+        })
+    
+    # High burnout index
+    if burnout_index and burnout_index >= 4.0:
+        recommendations.append({
+            "category": "burnout_prevention",
+            "priority": "high",
+            "message": f"Your burnout index ({round(burnout_index, 1)}/5) suggests you may be experiencing burnout symptoms.",
+            "action": "Prioritize rest and recovery. Quality sleep and breaks are essential for sustainable preparation."
         })
     
     # Increasing trend
@@ -198,5 +385,10 @@ def generate_personalized_insights(
     return {
         "comparative": comparative,
         "trends": trends,
-        "recommendations": sorted(recommendations, key=lambda x: {"high": 0, "medium": 1, "low": 2}[x["priority"]])
+        "recommendations": sorted(recommendations, key=lambda x: {"high": 0, "medium": 1, "low": 2}[x["priority"]]),
+        "indices": {
+            "anxiety": round(anxiety_index, 2) if anxiety_index else None,
+            "burnout": round(burnout_index, 2) if burnout_index else None
+        }
     }
+

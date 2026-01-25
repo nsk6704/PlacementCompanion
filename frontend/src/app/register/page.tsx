@@ -14,6 +14,7 @@ export default function RegisterPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [branch, setBranch] = useState("");
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
 
@@ -31,7 +32,7 @@ export default function RegisterPage() {
         try {
             const data = await apiRequest("/auth/register", {
                 method: "POST",
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email, password, branch }),
             });
 
             setAuthToken(data.access_token);
@@ -86,6 +87,27 @@ export default function RegisterPage() {
                                         className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                         required
                                     />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium" htmlFor="branch">
+                                        Branch / Specialization
+                                    </label>
+                                    <select
+                                        id="branch"
+                                        value={branch}
+                                        onChange={(e) => setBranch(e.target.value)}
+                                        className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        required
+                                    >
+                                        <option value="">Select your branch</option>
+                                        <option value="CSE">Computer Science & Engineering</option>
+                                        <option value="IT">Information Technology</option>
+                                        <option value="ECE">Electronics & Communication</option>
+                                        <option value="EEE">Electrical & Electronics</option>
+                                        <option value="MECH">Mechanical Engineering</option>
+                                        <option value="CIVIL">Civil Engineering</option>
+                                        <option value="OTHER">Other</option>
+                                    </select>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium" htmlFor="confirmPassword">

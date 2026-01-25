@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from database import create_db_and_tables, get_session, engine
 from models import SurveyMetadata, StudentCheckIn, User
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 # Pydantic models for request bodies
 class UserCreate(BaseModel):
@@ -202,8 +202,42 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+@app.get("/check-in/status")
+def get_check_in_status(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """Check if the user has already checked in today"""
+    # Get user's latest check-in
+    statement = select(StudentCheckIn).where(StudentCheckIn.user_email == current_user.email).order_by(StudentCheckIn.created_at.desc())
+    latest_checkin = session.exec(statement).first()
+    
+    if not latest_checkin:
+        return {"can_check_in": True, "last_check_in": None}
+    
+    # Check if latest check-in was today (UTC)
+    now = datetime.utcnow()
+    last_date = latest_checkin.created_at
+    
+    is_same_day = (now.year == last_date.year and 
+                  now.month == last_date.month and 
+                  now.day == last_date.day)
+    
+    return {
+        "can_check_in": not is_same_day, 
+        "last_check_in": last_date.isoformat(),
+        "next_allowed": (datetime(now.year, now.month, now.day) + timedelta(days=1)).isoformat()
+    }
+
 @app.post("/check-in", response_model=StudentCheckIn)
 def create_check_in(check_in: StudentCheckIn, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    # Check if already checked in today
+    statement = select(StudentCheckIn).where(StudentCheckIn.user_email == current_user.email).order_by(StudentCheckIn.created_at.desc())
+    latest_checkin = session.exec(statement).first()
+    
+    if latest_checkin:
+        now = datetime.utcnow()
+        last_date = latest_checkin.created_at
+        if (now.year == last_date.year and now.month == last_date.month and now.day == last_date.day):
+            raise HTTPException(status_code=400, detail="You have already checked in today. Please come back tomorrow!")
+
     check_in.user_email = current_user.email
     session.add(check_in)
     session.commit()

@@ -65,18 +65,11 @@ def detect_spike(values: List[float], threshold: float = 1.5) -> bool:
 def calculate_similarity_percentage(
     user_value: float,
     distribution: Dict[str, Any],
-    tolerance: float = 0.5
+    tolerance_std: float = 0.5
 ) -> Optional[Dict[str, Any]]:
     """
     Calculate what percentage of the population is in a similar range
-    
-    Args:
-        user_value: User's value (e.g., anxiety index)
-        distribution: Distribution stats from survey (mean, std, count)
-        tolerance: Range tolerance in standard deviations
-    
-    Returns:
-        Dictionary with percentage and context, or None if insufficient data
+    Using Normal Distribution PDF approximation to estimate population density
     """
     if not distribution or distribution.get('count', 0) == 0:
         return None
@@ -86,48 +79,39 @@ def calculate_similarity_percentage(
     count = distribution.get('count', 0)
     
     if mean is None or std is None or std == 0:
-        # If no std, use simple range check
-        if mean is not None and abs(user_value - mean) <= tolerance:
-            return {
-                'percentage': 50,  # Rough estimate
-                'count': count,
-                'is_similar': True
-            }
-        return None
+        return {
+            'percentage': 15, # conservative default
+            'count': count,
+            'is_similar': True
+        }
     
-    # Calculate how many standard deviations away from mean
-    z_score = abs(user_value - mean) / std
+    # Calculate z-score for the user's value
+    z_score = (user_value - mean) / std
     
-    # If within tolerance, calculate approximate percentage
-    # Using normal distribution approximation
-    if z_score <= tolerance:
-        # Within tolerance range - estimate percentage
-        # For ±0.5 std, roughly 38% of population
-        # For ±1.0 std, roughly 68% of population
-        percentage = min(100, int(38 + (tolerance - 0.5) * 30))
-        return {
-            'percentage': percentage,
-            'count': count,
-            'is_similar': True,
-            'z_score': z_score
-        }
-    elif z_score <= 1.0:
-        # Somewhat similar
-        percentage = max(20, int(68 - (z_score - tolerance) * 40))
-        return {
-            'percentage': percentage,
-            'count': count,
-            'is_similar': True,
-            'z_score': z_score
-        }
-    else:
-        # Not very similar
-        return {
-            'percentage': 10,
-            'count': count,
-            'is_similar': False,
-            'z_score': z_score
-        }
+    # We want to estimate people within [user_value - tolerance_std*std, user_value + tolerance_std*std]
+    # This is roughly 2 * tolerance_std * PDF(z)
+    # PDF of standard normal: (1 / sqrt(2*pi)) * exp(-z^2 / 2)
+    import math
+    pdf = (1 / math.sqrt(2 * math.pi)) * math.exp(-0.5 * (z_score ** 2))
+    
+    # Area approximation for a small range
+    # Multiplied by 100 for percentage
+    # We use a base "similarity window" (e.g., 1.0 standard deviation wide)
+    # Area = PDF * window_width
+    window_width = 1.0 
+    percentage = int(pdf * window_width * 100)
+    
+    # Cap between 5% and 40% (since a 1-std window at peak is ~39.9%)
+    # This represents "people like you"
+    percentage = max(5, min(40, percentage))
+    
+    return {
+        'percentage': percentage,
+        'count': count,
+        'is_similar': True,
+        'z_score': abs(z_score)
+    }
+
 
 
 def generate_personalized_insights(
@@ -193,7 +177,7 @@ def generate_personalized_insights(
     # Overall comparison
     if anxiety_index is not None:
         overall_anxiety = survey_distributions.get('overall', {}).get('anxiety', {})
-        similarity = calculate_similarity_percentage(anxiety_index, overall_anxiety, tolerance=0.6)
+        similarity = calculate_similarity_percentage(anxiety_index, overall_anxiety, tolerance_std=0.6)
         if similarity and similarity['is_similar']:
             comparative["comparisons"].append({
                 "context": "overall population",
@@ -207,7 +191,7 @@ def generate_personalized_insights(
     
     if burnout_index is not None:
         overall_burnout = survey_distributions.get('overall', {}).get('burnout', {})
-        similarity = calculate_similarity_percentage(burnout_index, overall_burnout, tolerance=0.6)
+        similarity = calculate_similarity_percentage(burnout_index, overall_burnout, tolerance_std=0.6)
         if similarity and similarity['is_similar']:
             comparative["comparisons"].append({
                 "context": "overall population",
@@ -225,7 +209,7 @@ def generate_personalized_insights(
         dept_data = survey_distributions['department'][dept]
         
         if anxiety_index is not None and 'anxiety' in dept_data:
-            similarity = calculate_similarity_percentage(anxiety_index, dept_data['anxiety'], tolerance=0.6)
+            similarity = calculate_similarity_percentage(anxiety_index, dept_data['anxiety'], tolerance_std=0.6)
             if similarity and similarity['is_similar']:
                 comparative["comparisons"].append({
                     "context": f"{dept} students",
@@ -238,7 +222,7 @@ def generate_personalized_insights(
                 })
         
         if burnout_index is not None and 'burnout' in dept_data:
-            similarity = calculate_similarity_percentage(burnout_index, dept_data['burnout'], tolerance=0.6)
+            similarity = calculate_similarity_percentage(burnout_index, dept_data['burnout'], tolerance_std=0.6)
             if similarity and similarity['is_similar']:
                 comparative["comparisons"].append({
                     "context": f"{dept} students",
@@ -256,7 +240,7 @@ def generate_personalized_insights(
         cgpa_data = survey_distributions['cgpa'][cgpa]
         
         if anxiety_index is not None and 'anxiety' in cgpa_data:
-            similarity = calculate_similarity_percentage(anxiety_index, cgpa_data['anxiety'], tolerance=0.6)
+            similarity = calculate_similarity_percentage(anxiety_index, cgpa_data['anxiety'], tolerance_std=0.6)
             if similarity and similarity['is_similar']:
                 comparative["comparisons"].append({
                     "context": f"students with {cgpa} CGPA",
@@ -274,7 +258,7 @@ def generate_personalized_insights(
         stage_data = survey_distributions['stage'][stage]
         
         if anxiety_index is not None and 'anxiety' in stage_data:
-            similarity = calculate_similarity_percentage(anxiety_index, stage_data['anxiety'], tolerance=0.6)
+            similarity = calculate_similarity_percentage(anxiety_index, stage_data['anxiety'], tolerance_std=0.6)
             if similarity and similarity['is_similar']:
                 stage_label = stage.replace('_', ' ').title()
                 comparative["comparisons"].append({
@@ -382,13 +366,43 @@ def generate_personalized_insights(
             "action": "Even 30 minutes of focused daily practice can help build confidence and reduce anxiety."
         })
     
+    # === PREP PROFILE & INTENSITY SCORING ===
+    # Map raw prep scores to research-aligned values
+    # Prep Hours Score: low -> 1, moderate -> 3, high -> 5 (using midpoints)
+    prep_hours_map = {"low": 1.5, "moderate": 4.0, "high": 7.0}
+    prep_hours_val = prep_hours_map.get(latest.get('prep_hours', 'moderate'), 4.0)
+    
+    # Prep Consistency: low -> 2, moderate -> 3.5, high -> 5
+    prep_consist_map = {"low": 2.0, "moderate": 3.5, "high": 5.0}
+    prep_consist_val = prep_consist_map.get(latest.get('prep_consistency', 'moderate'), 3.5)
+    
+    # Determine Prep Profile based on research buckets
+    # Matrix: Consistency (low < 3.5, high >= 3.5) and Hours (low < 3, moderate 3-5, high > 5)
+    prep_profile = "Moderate hours + moderate consistency"
+    
+    hours_cat = "Moderate"
+    if prep_hours_val < 3: hours_cat = "Low"
+    elif prep_hours_val > 5: hours_cat = "High"
+    
+    consist_cat = "Low"
+    if prep_consist_val >= 3.5: consist_cat = "High"
+    
+    prep_profile = f"{hours_cat} hours + {consist_cat} consistency"
+    
+    # Store profile in indices for dashboard use
+    indices = {
+        "anxiety": round(anxiety_index, 2) if anxiety_index else None,
+        "burnout": round(burnout_index, 2) if burnout_index else None,
+        "prep_hours_score": prep_hours_val,
+        "prep_consistency_score": prep_consist_val,
+        "prep_profile": prep_profile
+    }
+
     return {
         "comparative": comparative,
         "trends": trends,
         "recommendations": sorted(recommendations, key=lambda x: {"high": 0, "medium": 1, "low": 2}[x["priority"]]),
-        "indices": {
-            "anxiety": round(anxiety_index, 2) if anxiety_index else None,
-            "burnout": round(burnout_index, 2) if burnout_index else None
-        }
+        "indices": indices
     }
+
 
